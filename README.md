@@ -72,17 +72,12 @@ So the *presence* verdict is stable far past the error rate of real instruments.
 ## Usage
 
 ```bash
-make                                   # build
-make demo                              # synth dataset + screen it (ALERT table)
 
 # real use:
 kmerstash gen    --out data            # or bring your own FASTA
 kmerstash screen --ref panel.fa --sample reads.fa --k 21 --threshold 0.5
 kmerstash screen --ref panel.fa --sample reads.fa --csv     # machine-readable
 
-make bench                             # the three experiment CSVs
-make notebook                          # regenerate kmerstash_demo.ipynb
-make run-notebook                      # build + execute the notebook end-to-end
 ```
 
 `panel.fa` is your reference panel (one record per marker / gene / organism).
