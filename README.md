@@ -89,7 +89,7 @@ make run-notebook                      # build + execute the notebook end-to-end
 `reads.fa` is the sample (FASTA; reads or contigs). Containment ≥ `--threshold`
 fires an ALERT.
 
-## Honest scope / boundaries
+## Scope / boundaries
 
 - **Presence/absence and classification** are the sweet spot. For *where exactly*
   a read aligns and *with what mutations*, you'd add the extend (alignment) stage —
@@ -102,11 +102,3 @@ fires an ALERT.
   and COBOLMM search labs — built to demonstrate and benchmark the engine, with a
   notebook (`kmerstash_demo.ipynb`) that explains and plots it end to end.
 
-## Files
-
-| File | Role |
-|---|---|
-| `src/kmer.rs` | canonical k-mer engine (the analog of `tri.rs`) |
-| `src/main.rs` | CLI: `gen` / `screen` / `bench` |
-| `build_notebook.py` | generates `kmerstash_demo.ipynb` |
-| `Makefile` | `build` / `demo` / `bench` / `notebook` / `test` |
