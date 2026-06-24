@@ -30,7 +30,7 @@ The trick that makes it linear-time is the same as trigram search: a query of
 length L has ~L k-mers, each a single resident lookup, so screening is O(L)
 regardless of how big the reference panel or sample is.
 
-## The engine (`src/kmer.rs`)
+## The engine
 
 The trigram engine folds 3-grams into 37³ buckets and verifies candidates. For DNA
 two things change, and that is the whole engine:
