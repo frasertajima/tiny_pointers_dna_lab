@@ -1,0 +1,16 @@
+[package]
+name = "kmerstash"
+version = "0.1.0"
+edition = "2021"
+
+# Pure std on purpose: this is a "laptop-portable" screening tool. No external
+# crates -> `cargo build --release` works offline, the binary is self-contained,
+# and there is nothing to audit but our own code.
+
+[[bin]]
+name = "kmerstash"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
