@@ -166,6 +166,101 @@ ax.legend(); ax.grid(alpha=.3, which="both"); plt.tight_layout(); plt.show()
 print(f"background: {bg.mean():.2f}% mean (≈0).  marker: {mk.mean():.1f}% mean.  Clean gap between them.")
 """))
 
+cells.append(new_markdown_cell(r"""# One engine, many problems
+
+Everything so far screened a *static* file. But the containment core is just
+"how much of this is in that?" — and three other high-value problems are the same
+question asked from a different angle. Each is a thin wrapper on the identical
+engine; that reuse is the point.
+
+## 5. Sliding-window stream classification — a real-time trigger
+
+Instead of a static sample, feed a continuous stream through a rolling window and
+score each window against a resident profile. The score sits at ~0 until the
+signature passes through, spikes, then drops — turning the static screen into a
+zero-config **trigger / router** for live data (sequencer output, log streams,
+packets). Work per base is one membership test plus O(1) window bookkeeping:
+genuinely constant-time, independent of stream length *or* profile size.
+
+`bench --kind stream` builds a 50 kb stream that is background except for one
+marker spliced in at the midpoint (with 1% error) and reports the windowed
+containment along the stream."""))
+cells.append(new_code_cell(r"""st = run_csv("bench", "--kind", "stream")
+fig, ax = plt.subplots(figsize=(9, 4.2))
+ax.plot(st["pos"], st["containment"]*100, lw=1.4)
+sig = st[st["in_signature"]==1]
+ax.axvspan(sig["pos"].min(), sig["pos"].max(), color="#c0392b", alpha=.15,
+           label="signature actually present")
+ax.set_title("Sliding-window containment along a live stream — flat 0, instant spike")
+ax.set_xlabel("position in stream (bases)"); ax.set_ylabel("window containment (%)")
+ax.legend(); ax.grid(alpha=.3); plt.tight_layout(); plt.show()
+base = st[st["in_signature"]==0]["containment"].mean()*100
+peak = st["containment"].max()*100
+print(f"baseline (no signature): {base:.2f}%   peak (signature passing): {peak:.1f}%")
+print("=> a threshold anywhere in the gap is a clean, zero-latency-beyond-one-window trigger.")
+"""))
+
+cells.append(new_markdown_cell(r"""## 6. The anti-screen — background depletion to save downstream compute
+
+Sometimes you don't want what *is* there; you want to throw away what *shouldn't*
+be, so an expensive downstream stage only sees the interesting remainder. Index the
+**background** (host human DNA in a viral sample, boilerplate in a file corpus) and
+discard anything with high background-containment. What's left is concentrated.
+
+`bench --kind deplete` indexes a 200 kb "host" genome, builds a sample of 19,000
+host reads + 1,000 reads from a distinct novel target, and sweeps the keep-threshold
+— reporting how much host is removed, how much target is retained, and the resulting
+enrichment / downstream speedup."""))
+cells.append(new_code_cell(r"""dp = run_csv("bench", "--kind", "deplete")
+fig, ax = plt.subplots(1, 2, figsize=(13, 4.3))
+ax[0].plot(dp["threshold"]*100, dp["host_depleted"]*100, "o-", label="host depleted (removed)")
+ax[0].plot(dp["threshold"]*100, dp["target_retained"]*100, "s-", label="target retained (kept)")
+ax[0].set_title("Depletion vs. retention across the keep-threshold")
+ax[0].set_xlabel("max background-containment to keep (%)"); ax[0].set_ylabel("%")
+ax[0].legend(); ax[0].grid(alpha=.3)
+ax[1].plot(dp["threshold"]*100, dp["downstream_speedup"], "^-", color="tab:purple")
+ax[1].set_title("Downstream speedup (fewer reads to deep-process)")
+ax[1].set_xlabel("max background-containment to keep (%)"); ax[1].set_ylabel("x fewer reads")
+ax[1].grid(alpha=.3); plt.tight_layout(); plt.show()
+row = dp[np.isclose(dp.threshold, 0.30)].iloc[0]
+print(f"At a 30% keep-threshold: {row.host_depleted*100:.1f}% of host removed, "
+      f"{row.target_retained*100:.0f}% of target kept -> {row.enrichment:.1f}x enrichment, "
+      f"{row.downstream_speedup:.1f}x less downstream work.")
+"""))
+
+cells.append(new_markdown_cell(r"""## 7. Structural integrity — graceful degradation vs. a hash cliff
+
+Because the screen is error-tolerant, it can answer *"is this large dataset still
+essentially intact, and how much has it drifted?"* — a question a cryptographic hash
+**can't** answer, because SHA-256 is a 0/1 cliff: identical or not, with no notion
+of *how much* changed. Profile a known-good dataset's k-mers; corrupt copies at a
+rising rate; containment degrades smoothly in proportion to the damage.
+
+`bench --kind integrity` does exactly this on a 100 kb dataset."""))
+cells.append(new_code_cell(r"""ig = run_csv("bench", "--kind", "integrity")
+fig, ax = plt.subplots(figsize=(8.5, 4.6))
+ax.plot(ig["corruption_pct"], ig["containment"]*100, "o-", label="k-mer containment (fuzzy)")
+ax.plot(ig["corruption_pct"], ig["jaccard"]*100, "s--", alpha=.6, label="Jaccard similarity")
+ax.step(ig["corruption_pct"], ig["crypto_hash_match"]*100, where="post",
+        color="#c0392b", label="cryptographic hash (SHA-256)")
+ax.set_title("Graceful degradation vs. the all-or-nothing hash cliff")
+ax.set_xlabel("corruption (% of bases changed)"); ax.set_ylabel("match / similarity (%)")
+ax.legend(); ax.grid(alpha=.3); plt.tight_layout(); plt.show()
+print("At 1% corruption: containment {:.0f}% (still clearly 'mostly intact') "
+      "while the crypto hash already reads 0 (totally different)."
+      .format(ig[np.isclose(ig.corruption_pct,1.0)].iloc[0].containment*100))
+"""))
+cells.append(new_markdown_cell(r"""**Be precise about what this is — and isn't.** This is **fuzzy similarity**
+(the family of MinHash / `mash` distance / `ssdeep`), *not* tamper-evidence. It
+tells you **how much** changed and **which** shard drifted; it does **not** prove
+authenticity. It is not collision-resistant, and an adversary can alter content
+while preserving the k-mer profile. So it **complements** cryptographic hashes,
+it doesn't replace them: use SHA-256 to answer "was this forged?", use this to
+answer "is the fleet essentially intact, and where is the damage?" — fast, in one
+streaming pass, with no exact-copy requirement. (For arbitrary files rather than
+DNA, swap the 2-bit k-mer for a **byte-shingle** — the same math over a 256-letter
+alphabet, which is exactly the trigram engine this lab descends from.)"""))
+
 cells.append(new_markdown_cell(r"""## Honest scope / boundaries
 
 - **Presence/absence and classification** are the sweet spot — the question
@@ -188,6 +283,9 @@ cells.append(new_markdown_cell(r"""## Honest scope / boundaries
 | screening is linear & cheap | ~**35 Mbp/s** build; one marker screened in **µs** |
 | robust to sequencing error | **96.7%** sample containment at 10% error (54% at 20%) |
 | a single threshold suffices | marker vs background distributions are far apart |
+| stream classification | flat ~0, **instant spike** when the signature passes |
+| anti-screen / depletion | **~20×** enrichment, 100% target kept at a 30% threshold |
+| integrity (graceful degradation) | smooth containment curve vs the hash's 0/1 cliff |
 
 **Bottom line.** The same constant-work-per-query idea behind trigram text search
 — index the rare k-grams, look each up once — drops cleanly onto DNA and yields a
